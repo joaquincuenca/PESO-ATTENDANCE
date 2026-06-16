@@ -10,8 +10,86 @@ import {
   Clock,
   CheckCircle,
   Calendar,
-  User
+  User,
+  AlertCircle,
+  CheckCircle2,
+  XCircle
 } from "lucide-react";
+
+// Toast notification component
+const Toast = ({ message, type, onClose }) => {
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      onClose();
+    }, 5000);
+    return () => clearTimeout(timer);
+  }, [onClose]);
+
+  const bgColors = {
+    success: "bg-green-50 border-green-500 text-green-800",
+    error: "bg-red-50 border-red-500 text-red-800",
+    warning: "bg-yellow-50 border-yellow-500 text-yellow-800",
+    info: "bg-blue-50 border-blue-500 text-blue-800"
+  };
+
+  const icons = {
+    success: <CheckCircle2 className="w-5 h-5 text-green-500" />,
+    error: <XCircle className="w-5 h-5 text-red-500" />,
+    warning: <AlertCircle className="w-5 h-5 text-yellow-500" />,
+    info: <AlertCircle className="w-5 h-5 text-blue-500" />
+  };
+
+  return (
+    <div className={`fixed top-4 right-4 z-50 flex items-center space-x-3 px-4 py-3 rounded-lg border-l-4 shadow-lg ${bgColors[type]} min-w-[300px] animate-slide-in`}>
+      {icons[type]}
+      <span className="flex-1 text-sm font-medium">{message}</span>
+      <button onClick={onClose} className="opacity-70 hover:opacity-100 transition-opacity">
+        <X className="w-4 h-4" />
+      </button>
+    </div>
+  );
+};
+
+// Modern popup modal - visible with soft backdrop
+const ConfirmModal = ({ isOpen, onClose, onConfirm, employeeName, recordDate }) => {
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm animate-fade-in">
+      <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full mx-4 transform transition-all animate-scale-up">
+        <div className="p-6">
+          <div className="flex items-center justify-center w-14 h-14 mx-auto bg-red-50 rounded-full">
+            <Trash2 className="w-7 h-7 text-red-500" />
+          </div>
+          <h3 className="mt-4 text-xl font-semibold text-center text-gray-900">Delete Attendance Record?</h3>
+          <p className="mt-2 text-center text-gray-500">
+            Are you sure you want to delete the record for
+          </p>
+          <p className="text-center font-medium text-gray-800 mt-1">
+            {employeeName} · {recordDate}
+          </p>
+          <p className="mt-3 text-xs text-center text-red-400">
+            This action cannot be undone.
+          </p>
+          <div className="flex gap-3 mt-6">
+            <button
+              onClick={onClose}
+              className="flex-1 px-4 py-2.5 text-sm font-medium text-gray-700 bg-gray-100 rounded-xl hover:bg-gray-200 transition-all duration-200"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={onConfirm}
+              className="flex-1 px-4 py-2.5 text-sm font-medium text-white bg-gradient-to-r from-red-500 to-red-600 rounded-xl hover:from-red-600 hover:to-red-700 shadow-md hover:shadow-lg transition-all duration-200"
+            >
+              Delete
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
 
 export default function Attendance() {
   const [attendance, setAttendance] = useState([]);
@@ -21,6 +99,18 @@ export default function Attendance() {
   const [filterEmployee, setFilterEmployee] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
   const [currentTime, setCurrentTime] = useState(new Date());
+  
+  // Notification state
+  const [notification, setNotification] = useState(null);
+  
+  // Modal state
+  const [modalOpen, setModalOpen] = useState(false);
+  const [recordToDelete, setRecordToDelete] = useState(null);
+
+  // Show notification helper
+  const showNotification = (message, type = "info") => {
+    setNotification({ message, type });
+  };
 
   // Real-time clock
   useEffect(() => {
@@ -36,39 +126,64 @@ export default function Attendance() {
   }, []);
 
   const fetchEmployees = async () => {
-    const { data } = await supabase.from("employees").select("id, fullname");
-    if (data) {
-      const empMap = {};
-      data.forEach(emp => empMap[emp.id] = emp.fullname);
-      setEmployees(empMap);
+    try {
+      const { data, error } = await supabase.from("employees").select("id, fullname");
+      if (error) throw error;
+      if (data) {
+        const empMap = {};
+        data.forEach(emp => empMap[emp.id] = emp.fullname);
+        setEmployees(empMap);
+      }
+    } catch (error) {
+      showNotification("Failed to load employees: " + error.message, "error");
     }
   };
 
   const fetchAttendance = async () => {
     setLoading(true);
-    const { data, error } = await supabase
-      .from("attendance")
-      .select("*")
-      .order("attendance_date", { ascending: false });
-    
-    if (!error && data) {
-      setAttendance(data);
+    try {
+      const { data, error } = await supabase
+        .from("attendance")
+        .select("*")
+        .order("attendance_date", { ascending: false });
+      
+      if (error) throw error;
+      if (data) {
+        setAttendance(data);
+        showNotification(`Loaded ${data.length} attendance records`, "success");
+      }
+    } catch (error) {
+      showNotification("Failed to load attendance: " + error.message, "error");
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   };
 
-  const deleteRecord = async (id) => {
-    if (window.confirm("Delete this attendance record?")) {
+  // Open modal with record details
+  const openDeleteModal = (record) => {
+    setRecordToDelete(record);
+    setModalOpen(true);
+  };
+
+  // Perform deletion after confirmation
+  const confirmDelete = async () => {
+    if (!recordToDelete) return;
+    
+    setModalOpen(false);
+    try {
       const { error } = await supabase
         .from("attendance")
         .delete()
-        .eq("id", id);
+        .eq("id", recordToDelete.id);
       
-      if (!error) {
-        fetchAttendance();
-      } else {
-        alert("Error: " + error.message);
-      }
+      if (error) throw error;
+      
+      showNotification("Attendance record deleted successfully!", "success");
+      await fetchAttendance();
+    } catch (error) {
+      showNotification("Error deleting record: " + error.message, "error");
+    } finally {
+      setRecordToDelete(null);
     }
   };
 
@@ -96,30 +211,36 @@ export default function Attendance() {
   const exportToCSV = () => {
     const filtered = getFilteredAttendance();
     
-    const csvData = filtered.map(record => ({
-      'Employee': employees[record.employee_id] || 'Unknown',
-      'Date': record.attendance_date,
-      'Time In': record.time_in ? new Date(record.time_in).toLocaleTimeString() : '-',
-      'Time Out': record.time_out ? new Date(record.time_out).toLocaleTimeString() : '-',
-      'Hours': record.time_in && record.time_out ? 
-        ((new Date(record.time_out) - new Date(record.time_in)) / (1000 * 60 * 60)).toFixed(1) : '-'
-    }));
-
-    if (csvData.length === 0) {
-      alert("No data to export");
+    if (filtered.length === 0) {
+      showNotification("No data to export. Please adjust your filters.", "warning");
       return;
     }
 
-    const csvHeaders = Object.keys(csvData[0]).join(',');
-    const csvRows = csvData.map(row => Object.values(row).join(','));
-    const csvString = [csvHeaders, ...csvRows].join('\n');
-    const blob = new Blob([csvString], { type: 'text/csv' });
-    const url = window.URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `attendance_${new Date().toISOString().split('T')[0]}.csv`;
-    a.click();
-    window.URL.revokeObjectURL(url);
+    try {
+      const csvData = filtered.map(record => ({
+        'Employee': employees[record.employee_id] || 'Unknown',
+        'Date': record.attendance_date,
+        'Time In': record.time_in ? new Date(record.time_in).toLocaleTimeString() : '-',
+        'Time Out': record.time_out ? new Date(record.time_out).toLocaleTimeString() : '-',
+        'Hours': record.time_in && record.time_out ? 
+          ((new Date(record.time_out) - new Date(record.time_in)) / (1000 * 60 * 60)).toFixed(1) : '-'
+      }));
+
+      const csvHeaders = Object.keys(csvData[0]).join(',');
+      const csvRows = csvData.map(row => Object.values(row).join(','));
+      const csvString = [csvHeaders, ...csvRows].join('\n');
+      const blob = new Blob([csvString], { type: 'text/csv' });
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `attendance_${new Date().toISOString().split('T')[0]}.csv`;
+      a.click();
+      window.URL.revokeObjectURL(url);
+      
+      showNotification(`Successfully exported ${filtered.length} records to CSV`, "success");
+    } catch (error) {
+      showNotification("Error exporting data: " + error.message, "error");
+    }
   };
 
   const formatTimeWithSeconds = (date) => {
@@ -129,6 +250,13 @@ export default function Attendance() {
       second: '2-digit',
       hour12: true
     });
+  };
+
+  const clearFilters = () => {
+    setFilterDate("");
+    setFilterEmployee("");
+    setSearchTerm("");
+    showNotification("All filters have been cleared", "info");
   };
 
   const filteredAttendance = getFilteredAttendance();
@@ -143,6 +271,27 @@ export default function Attendance() {
 
   return (
     <Layout>
+      {/* Modern Confirmation Modal */}
+      <ConfirmModal
+        isOpen={modalOpen}
+        onClose={() => {
+          setModalOpen(false);
+          setRecordToDelete(null);
+        }}
+        onConfirm={confirmDelete}
+        employeeName={recordToDelete ? employees[recordToDelete.employee_id] || "Unknown" : ""}
+        recordDate={recordToDelete ? recordToDelete.attendance_date : ""}
+      />
+
+      {/* Notification Toast */}
+      {notification && (
+        <Toast 
+          message={notification.message} 
+          type={notification.type} 
+          onClose={() => setNotification(null)} 
+        />
+      )}
+
       {/* Header with Clock */}
       <div className="flex justify-between items-center mb-6">
         <div>
@@ -255,7 +404,7 @@ export default function Attendance() {
           
           <div className="flex gap-2">
             <button
-              onClick={() => { setFilterDate(""); setFilterEmployee(""); setSearchTerm(""); }}
+              onClick={clearFilters}
               className="px-4 py-2 text-sm text-gray-600 border rounded-lg hover:bg-gray-50"
             >
               Clear
@@ -341,7 +490,7 @@ export default function Attendance() {
                       <td className="px-4 py-3 text-gray-600">{hoursWorked}</td>
                       <td className="px-4 py-3">
                         <button
-                          onClick={() => deleteRecord(record.id)}
+                          onClick={() => openDeleteModal(record)}
                           className="text-red-600 hover:text-red-800 transition-colors"
                           title="Delete"
                         >
@@ -363,6 +512,47 @@ export default function Attendance() {
           </div>
         </div>
       </div>
+
+      {/* Animation styles */}
+      <style jsx>{`
+        @keyframes slideIn {
+          from {
+            transform: translateX(100%);
+            opacity: 0;
+          }
+          to {
+            transform: translateX(0);
+            opacity: 1;
+          }
+        }
+        @keyframes fadeIn {
+          from {
+            opacity: 0;
+          }
+          to {
+            opacity: 1;
+          }
+        }
+        @keyframes scaleUp {
+          from {
+            opacity: 0;
+            transform: scale(0.95);
+          }
+          to {
+            opacity: 1;
+            transform: scale(1);
+          }
+        }
+        .animate-slide-in {
+          animation: slideIn 0.3s ease-out;
+        }
+        .animate-fade-in {
+          animation: fadeIn 0.2s ease-out;
+        }
+        .animate-scale-up {
+          animation: scaleUp 0.25s ease-out;
+        }
+      `}</style>
     </Layout>
   );
 }
