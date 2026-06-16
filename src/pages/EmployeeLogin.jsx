@@ -161,11 +161,12 @@ export default function EmployeeLogin() {
                     mirrored
                     audio={false}
                     screenshotFormat="image/jpeg"
-                    className="w-full h-full object-cover"
+                    className="w-full h-full object-contain bg-black"
                     videoConstraints={{
                       facingMode: "user",
-                      width: { ideal: 640, max: 1280 },
-                      height: { ideal: 480, max: 720 },
+                      width: { ideal: 1280 },
+                      height: { ideal: 720 },
+                      aspectRatio: 1.777777778, // 16:9
                     }}
                     onUserMedia={() => setCameraReady(true)}
                     onUserMediaError={() => setCameraReady(false)}
