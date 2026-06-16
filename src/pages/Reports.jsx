@@ -73,14 +73,12 @@ export default function Reports() {
     }
   };
 
-  // Helper: Determine time-in status (Late / On Time / Absent)
   const getTimeInStatus = (record) => {
     if (!record.time_in) return "Absent";
-    const timeInHour = new Date(record.time_in).getHours();
-    const timeInMin = new Date(record.time_in).getMinutes();
-    const totalMinutes = timeInHour * 60 + timeInMin;
-    const threshold = 8 * 60 + 30; // 08:30
-    return totalMinutes > threshold ? "Late" : "On Time";
+    const date = new Date(record.time_in);
+    const totalMinutes = date.getHours() * 60 + date.getMinutes();
+    const cutoff = 7 * 60; // 7:00 AM
+    return totalMinutes > cutoff ? "Late" : "On Time";
   };
 
   const calculateStats = (data) => {
