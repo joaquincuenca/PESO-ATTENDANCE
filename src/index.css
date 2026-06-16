@@ -1,0 +1,157 @@
+@import "tailwindcss";
+
+/* ========== FaceScanOverlay Styles ========== */
+.scan-overlay-container {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  border-radius: 1rem;
+  background: rgba(2, 8, 20, 0.88);
+  backdrop-filter: blur(4px);
+}
+
+.scan-canvas-wrapper {
+  position: relative;
+  width: 320px;
+  height: 300px;
+}
+
+/* Corner brackets */
+.scan-corner {
+  position: absolute;
+  width: 22px;
+  height: 22px;
+  border-style: solid;
+  transition: border-color 0.5s;
+}
+.scan-corner-tl { top: 0; left: 0; border-width: 2px 0 0 2px; }
+.scan-corner-tr { top: 0; right: 0; border-width: 2px 2px 0 0; }
+.scan-corner-bl { bottom: 0; left: 0; border-width: 0 0 2px 2px; }
+.scan-corner-br { bottom: 0; right: 0; border-width: 0 2px 2px 0; }
+
+/* Edge lines */
+.scan-edge-top {
+  position: absolute;
+  top: 0;
+  left: 22px;
+  right: 22px;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(0,200,255,0.3), transparent);
+}
+.scan-edge-bottom {
+  position: absolute;
+  bottom: 0;
+  left: 22px;
+  right: 22px;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(0,200,255,0.3), transparent);
+}
+.scan-edge-left {
+  position: absolute;
+  left: 0;
+  top: 22px;
+  bottom: 22px;
+  width: 1px;
+  background: linear-gradient(180deg, transparent, rgba(0,200,255,0.2), transparent);
+}
+.scan-edge-right {
+  position: absolute;
+  right: 0;
+  top: 22px;
+  bottom: 22px;
+  width: 1px;
+  background: linear-gradient(180deg, transparent, rgba(0,200,255,0.2), transparent);
+}
+
+/* Small tick marks */
+.scan-tick {
+  position: absolute;
+  background: rgba(0,200,255,0.6);
+}
+.scan-tick-top-left { top: 0; left: 60px; width: 18px; height: 1px; }
+.scan-tick-top-right { top: 0; right: 60px; width: 18px; height: 1px; }
+.scan-tick-bottom-left { bottom: 0; left: 60px; width: 18px; height: 1px; }
+.scan-tick-bottom-right { bottom: 0; right: 60px; width: 18px; height: 1px; }
+.scan-tick-left { left: 0; top: 55px; width: 1px; height: 14px; }
+.scan-tick-right { right: 0; top: 55px; width: 1px; height: 14px; }
+
+/* Status text */
+.scan-status-text {
+  font-family: 'Courier New', monospace;
+  font-size: 11px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  margin-top: 10px;
+  margin-bottom: 10px;
+}
+
+/* Progress bar container */
+.scan-progress-bar {
+  width: 280px;
+  height: 18px;
+  background: rgba(0,80,130,0.2);
+  border: 1px solid rgba(0,200,255,0.2);
+  border-radius: 2px;
+  position: relative;
+  overflow: hidden;
+}
+.scan-progress-fill {
+  height: 100%;
+  border-radius: 1px;
+  position: relative;
+  transition: background 0.5s;
+}
+.scan-progress-fill::after {
+  content: '';
+  position: absolute;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  width: 16px;
+  background: rgba(255,255,255,0.3);
+}
+.scan-progress-label {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: 'Courier New', monospace;
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  color: #c8f0ff;
+}
+
+/* Step dots */
+.scan-steps {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 12px;
+}
+.scan-step-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  transition: all 0.2s;
+}
+.scan-step-line {
+  width: 14px;
+  height: 1px;
+  background: rgba(0,100,160,0.5);
+}
+
+/* Animation */
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
