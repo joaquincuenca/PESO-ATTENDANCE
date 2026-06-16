@@ -161,7 +161,7 @@ export default function EmployeeLogin() {
                     mirrored
                     audio={false}
                     screenshotFormat="image/jpeg"
-                    className="w-full h-full object-contain bg-black"
+                    className="w-full h-full object-cover"
                     videoConstraints={{
                       facingMode: "user",
                       width: { ideal: 1280 },
