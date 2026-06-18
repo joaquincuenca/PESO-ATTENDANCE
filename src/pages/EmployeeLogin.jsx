@@ -155,7 +155,7 @@ export default function EmployeeLogin() {
             <div className="flex-1 min-w-0">
               <div className="relative">
                 <div className="absolute -inset-1 bg-gradient-to-r from-cyan-500 to-blue-600 rounded-2xl blur opacity-30" />
-                <div className="relative bg-black rounded-2xl overflow-hidden aspect-[4/3] lg:aspect-video">
+                <div className="relative bg-black rounded-2xl overflow-hidden aspect-[3/4] md:aspect-[4/3] lg:aspect-video">
                   <Webcam
                     ref={webcamRef}
                     mirrored
