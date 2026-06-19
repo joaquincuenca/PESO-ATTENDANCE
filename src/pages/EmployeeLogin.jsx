@@ -1,10 +1,11 @@
+// pages/EmployeeLogin.jsx
 import { useEffect, useRef, useState } from "react";
 import Webcam from "react-webcam";
 import * as faceapi from "face-api.js";
 import { Link } from "react-router-dom";
 import {
   User, Clock, CheckCircle, LogOut, ArrowLeft,
-  Loader2, Camera, Circle, Sun, Check,
+  Loader2, Camera, Circle, Sun,
 } from "lucide-react";
 
 import FaceScanOverlay from "../components/FaceScanOverlay";
@@ -32,16 +33,16 @@ export default function EmployeeLogin() {
     return () => clearInterval(timer);
   }, []);
 
-  // Load face-api models on mount
+  // Load face-api models
   useEffect(() => {
     loadFaceModels(setAttendanceStatus).then(success => {
       if (success) setModelsLoaded(true);
     });
   }, []);
 
-  const formatTime = d => d.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", hour12: true });
-  const formatSeconds = d => d.getSeconds().toString().padStart(2, "0");
-  const formatDate = d => d.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric", year: "numeric" });
+  const formatTime = (d) => d.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", hour12: true });
+  const formatSeconds = (d) => d.getSeconds().toString().padStart(2, "0");
+  const formatDate = (d) => d.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric", year: "numeric" });
 
   const processAttendance = async (action) => {
     const video = webcamRef.current?.video;
@@ -52,13 +53,12 @@ export default function EmployeeLogin() {
 
     setIsProcessing(true);
     setAttendanceStatus(null);
+    setVerifyingStep("detecting");
 
     try {
-      setVerifyingStep("detecting");
-      await new Promise(r => setTimeout(r, 700));
-
+      // Detecting Face
       const detection = await faceapi
-        .detectSingleFace(video, new faceapi.TinyFaceDetectorOptions())
+        .detectSingleFace(video, new faceapi.TinyFaceDetectorOptions({ inputSize: 512 }))
         .withFaceLandmarks()
         .withFaceDescriptor();
 
@@ -68,48 +68,62 @@ export default function EmployeeLogin() {
         return;
       }
 
+      // Analyzing
       setVerifyingStep("analyzing");
-      await new Promise(r => setTimeout(r, 700));
+      await new Promise(r => setTimeout(r, 450));
+
       const descriptor = Array.from(detection.descriptor);
 
+      // Matching
       setVerifyingStep("matching");
-      await new Promise(r => setTimeout(r, 700));
       const employee = await findEmployee(descriptor);
+
       if (!employee) {
         setVerifyingStep(null);
         setAttendanceStatus({ type: "error", message: "Face not recognized. Please register first." });
         return;
       }
 
+      // Verifying
       setVerifyingStep("verifying");
-      await new Promise(r => setTimeout(r, 600));
+      await new Promise(r => setTimeout(r, 550));
+
       setCurrentEmployee(employee);
 
+      // Attendance Logic
       const today = new Date().toISOString().split("T")[0];
       const now = new Date().toISOString();
       const existing = await checkTodayAttendance(employee.id);
 
+      let photoUrl;
       if (action === "TIME_IN") {
-        const photoUrl = await capturePhoto(webcamRef, employee.id, "in");
+        photoUrl = await capturePhoto(webcamRef, employee.id, "in");
+
         if (existing?.time_in) {
           setAttendanceStatus({ type: "warning", message: `${employee.fullname}, already timed in at ${new Date(existing.time_in).toLocaleTimeString()}` });
-        } else if (existing) {
-          const { error } = await supabase.from("attendance").update({ time_in: now, time_in_photo_url: photoUrl }).eq("id", existing.id);
-          setAttendanceStatus(error ? { type: "error", message: `Failed: ${error.message}` } : { type: "success", message: `${employee.fullname}, Time In recorded` });
         } else {
-          const { error } = await supabase.from("attendance").insert([{ employee_id: employee.id, attendance_date: today, time_in: now, time_in_photo_url: photoUrl }]);
-          setAttendanceStatus(error ? { type: "error", message: `Failed: ${error.message}` } : { type: "success", message: `${employee.fullname}, Time In recorded` });
+          const { error } = existing
+            ? await supabase.from("attendance").update({ time_in: now, time_in_photo_url: photoUrl }).eq("id", existing.id)
+            : await supabase.from("attendance").insert([{ employee_id: employee.id, attendance_date: today, time_in: now, time_in_photo_url: photoUrl }]);
+
+          setAttendanceStatus(error 
+            ? { type: "error", message: `Failed: ${error.message}` } 
+            : { type: "success", message: `${employee.fullname}, Time In recorded` }
+          );
         }
       } else {
         // TIME_OUT
         if (!existing?.time_in) {
           setAttendanceStatus({ type: "warning", message: `${employee.fullname}, you haven't timed in yet.` });
         } else if (existing.time_out) {
-          setAttendanceStatus({ type: "warning", message: `${employee.fullname}, already timed out at ${new Date(existing.time_out).toLocaleTimeString()}` });
+          setAttendanceStatus({ type: "warning", message: `${employee.fullname}, already timed out.` });
         } else {
-          const photoUrl = await capturePhoto(webcamRef, employee.id, "out");
+          photoUrl = await capturePhoto(webcamRef, employee.id, "out");
           const { error } = await supabase.from("attendance").update({ time_out: now, time_out_photo_url: photoUrl }).eq("id", existing.id);
-          setAttendanceStatus(error ? { type: "error", message: `Failed: ${error.message}` } : { type: "success", message: `${employee.fullname}, Time Out recorded` });
+          setAttendanceStatus(error 
+            ? { type: "error", message: `Failed: ${error.message}` } 
+            : { type: "success", message: `${employee.fullname}, Time Out recorded` }
+          );
         }
       }
     } catch (error) {
@@ -117,7 +131,7 @@ export default function EmployeeLogin() {
     } finally {
       setVerifyingStep(null);
       setIsProcessing(false);
-      setTimeout(() => setCurrentEmployee(null), 3000);
+      setTimeout(() => setCurrentEmployee(null), 2800);
     }
   };
 
@@ -125,6 +139,7 @@ export default function EmployeeLogin() {
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 flex items-center justify-center p-3 sm:p-6">
       <div className="w-full max-w-6xl">
         <div className="bg-white/10 backdrop-blur-xl rounded-3xl shadow-2xl border border-white/20 overflow-hidden">
+          
           {/* Header */}
           <div className="bg-gradient-to-r from-purple-600 to-pink-600 px-4 sm:px-8 py-3 sm:py-4">
             <div className="flex items-center justify-between gap-3">
@@ -166,7 +181,6 @@ export default function EmployeeLogin() {
                       facingMode: "user",
                       width: { ideal: 1280 },
                       height: { ideal: 720 },
-                      aspectRatio: 1.777777778, // 16:9
                     }}
                     onUserMedia={() => setCameraReady(true)}
                     onUserMediaError={() => setCameraReady(false)}
@@ -175,10 +189,10 @@ export default function EmployeeLogin() {
                     <Circle className="w-2 h-2 sm:w-2.5 sm:h-2.5 text-red-500 fill-red-500 animate-pulse" />
                     <span className="text-white text-xs font-medium">LIVE</span>
                   </div>
-                  <div className="absolute inset-0 border-2 border-cyan-500/40 rounded-2xl pointer-events-none" />
-                  {verifyingStep && <FaceScanOverlay step={verifyingStep} />}
+                  <FaceScanOverlay step={verifyingStep} />
                 </div>
               </div>
+
               {!modelsLoaded && (
                 <div className="mt-3 sm:mt-4 bg-white/10 backdrop-blur-sm text-cyan-200 p-3 rounded-xl text-center border border-white/10">
                   <div className="flex items-center justify-center space-x-2">
@@ -192,8 +206,7 @@ export default function EmployeeLogin() {
             {/* Controls */}
             <div className="w-full lg:w-80 space-y-3 sm:space-y-4">
               {currentEmployee && (
-                <div className="bg-gradient-to-r from-green-500 to-emerald-600 text-white p-3 sm:p-4 rounded-xl text-center shadow-lg"
-                     style={{ animation: "slideDown 0.3s ease-out" }}>
+                <div className="bg-gradient-to-r from-green-500 to-emerald-600 text-white p-3 sm:p-4 rounded-xl text-center shadow-lg transition-all duration-300">
                   <div className="flex items-center justify-center space-x-2">
                     <User className="w-5 h-5 sm:w-6 sm:h-6 flex-shrink-0" />
                     <div>
@@ -203,8 +216,9 @@ export default function EmployeeLogin() {
                   </div>
                 </div>
               )}
+
               {attendanceStatus && (
-                <div className={`p-3 rounded-xl text-center text-sm ${
+                <div className={`p-3 rounded-xl text-center text-sm transition-all duration-300 ${
                   attendanceStatus.type === "success" ? "bg-green-500/20 text-green-200 border border-green-500/50" :
                   attendanceStatus.type === "error"   ? "bg-red-500/20 text-red-200 border border-red-500/50" :
                                                         "bg-yellow-500/20 text-yellow-200 border border-yellow-500/50"
@@ -233,6 +247,7 @@ export default function EmployeeLogin() {
                     </span>
                   )}
                 </button>
+
                 <button
                   onClick={() => processAttendance("TIME_OUT")}
                   disabled={!modelsLoaded || isProcessing}
@@ -254,22 +269,27 @@ export default function EmployeeLogin() {
                 </button>
               </div>
 
+              {/* Status Box */}
               <div className="bg-white/5 backdrop-blur-sm rounded-xl p-3 sm:p-4 border border-white/10">
                 <div className="grid grid-cols-2 gap-3 text-center">
                   <div>
                     <p className="text-cyan-300 text-xs mb-1">Status</p>
                     <p className="text-white font-semibold text-sm flex items-center justify-center">
-                      {modelsLoaded
-                        ? <><Check className="w-3 h-3 mr-1 text-green-400" />Ready</>
-                        : <><Loader2 className="w-3 h-3 mr-1 animate-spin" />Loading</>}
+                      {modelsLoaded ? (
+                        <><CheckCircle className="w-3 h-3 mr-1 text-green-400" />Ready</>
+                      ) : (
+                        <><Loader2 className="w-3 h-3 mr-1 animate-spin" />Loading</>
+                      )}
                     </p>
                   </div>
                   <div>
                     <p className="text-cyan-300 text-xs mb-1">Camera</p>
                     <p className="text-white font-semibold text-sm flex items-center justify-center">
-                      {cameraReady
-                        ? <><Camera className="w-3 h-3 mr-1 text-green-400" />Active</>
-                        : <><Clock className="w-3 h-3 mr-1 text-yellow-400" />Waiting</>}
+                      {cameraReady ? (
+                        <><Camera className="w-3 h-3 mr-1 text-green-400" />Active</>
+                      ) : (
+                        <><Clock className="w-3 h-3 mr-1 text-yellow-400" />Waiting</>
+                      )}
                     </p>
                   </div>
                 </div>
@@ -294,12 +314,6 @@ export default function EmployeeLogin() {
           </div>
         </div>
       </div>
-      <style>{`
-        @keyframes slideDown {
-          from { opacity: 0; transform: translateY(-10px); }
-          to   { opacity: 1; transform: translateY(0); }
-        }
-      `}</style>
     </div>
   );
 }

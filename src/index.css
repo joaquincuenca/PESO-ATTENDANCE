@@ -155,3 +155,12 @@
     transform: translateY(0);
   }
 }
+
+@keyframes scan {
+  0% { top: 15%; }
+  100% { top: 85%; }
+}
+
+.animate-scan {
+  animation: scan 1.6s ease-in-out infinite;
+}
